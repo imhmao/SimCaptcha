@@ -10,6 +10,22 @@ namespace SimCaptcha
     {
         public const string SimCaptcha = "SimCaptcha";
 
+
+        public string HZ { get; set; } 
+
+        public int CodeLength { get; set; } = 4;
+
+        public int WashCodeLength { get; set; } = 6;
+
+        public string[] Colors { get; set; }
+
+        public string[] Fonts { get; set; }
+
+        public string BackgroundPath { get; set; }
+
+        // ↑以上仅供绘图使用
+
+
         public string AppId { get; set; }
 
         public string AppSecret { get; set; }

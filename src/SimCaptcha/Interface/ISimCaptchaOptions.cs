@@ -6,6 +6,20 @@ namespace SimCaptcha.Interface
 {
     public interface ISimCaptchaOptions
     {
+        string HZ { get; set; }
+
+        int CodeLength { get; set; } 
+
+        int WashCodeLength { get; set; } 
+
+        string[] Colors { get; set; }
+
+        string[] Fonts { get; set; }
+
+        string BackgroundPath { get; set; }
+
+        // ↑以上仅供绘图使用
+
         string AppId { get; set; }
 
         string AppSecret { get; set; }

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 // Project: SimCaptcha
 // https://github.com/yiyungent/SimCaptcha
 // Author: yiyun <yiyungent@gmail.com>
@@ -13,29 +14,53 @@ namespace SimCaptcha.AspNetCore
 {
     public class AspNetCoreVCodeImage : IVCodeImage
     {
-        public VCodeImgModel Create(string code, int width, int height)
+        public VCodeImgModel Create(string code, int width, int height, ISimCaptchaOptions options)
         {
             VCodeImgModel rtnResult = new VCodeImgModel { VCodePos = new List<PointPosModel>() };
 
             // TODO: 变化点: 答案: 4个字
-            int rightCodeLength = 4;
+            int rightCodeLength = options.CodeLength;
 
             Bitmap Img = null;
             Graphics g = null;
             MemoryStream ms = null;
-            Random random = new Random();
 
             Color[] color_Array = { Color.Black, Color.DarkBlue, Color.Green, Color.Orange, Color.Brown, Color.DarkCyan, Color.Purple };
-            string[] fonts = { "lnk Free", "Segoe Print", "Comic Sans MS", "MV Boli", "华文行楷" };
-            // TODO: 可能有错, 在windows, linux下 分割符不同
-            string _base = Path.Combine(Environment.CurrentDirectory, "SimCaptcha", "bgImages");
-            //string _base = Environment.CurrentDirectory + "\\SimCaptcha\\bgImages\\";
+
+            if (options.Colors != null && options.Colors.Any())
+            {
+                List<Color> clrLst = new List<Color>();
+                foreach (var c in options.Colors)
+                {
+                    if (c.StartsWith("#"))
+                    {
+                        try
+                        {
+                            clrLst.Add(Color.FromArgb(Convert.ToInt32($"FF{ c[1..]}", 16)));
+                        }
+                        catch { }
+                    }
+                    else
+                        clrLst.Add(Color.FromName(c));
+                }
+
+                color_Array = clrLst.ToArray();
+            }
+
+            string[] fonts = options.Fonts;
+
+            string _base = options.BackgroundPath;
+
+            if (_base.StartsWith("~/"))
+                _base = Path.Combine(Environment.CurrentDirectory, options.BackgroundPath[2..]);
 
             var _file_List = System.IO.Directory.GetFiles(_base);
             int imageCount = _file_List.Length;
             if (imageCount == 0)
                 throw new Exception("image not Null");
 
+            long tick = DateTime.Now.Ticks;
+            Random random = new Random((int)(tick & 0xffffffffL) | (int)(tick >> 32));
             int imageRandom = random.Next(1, (imageCount + 1));
             string _random_file_image = _file_List[imageRandom - 1];
             var imageStream = Image.FromFile(_random_file_image);
@@ -43,43 +68,61 @@ namespace SimCaptcha.AspNetCore
             Img = new Bitmap(imageStream, width, height);
             imageStream.Dispose();
             g = Graphics.FromImage(Img);
-            Color[] penColor = { Color.LightGray, Color.Green, Color.Blue };
+
+
             int code_length = code.Length;
             List<string> words = new List<string>();
             for (int i = 0; i < code_length; i++)
             {
                 int cindex = random.Next(color_Array.Length);
                 int findex = random.Next(fonts.Length);
-                Font f = new Font(fonts[findex], 15, FontStyle.Bold);
-                Brush b = new SolidBrush(color_Array[cindex]);
-                int _y = random.Next(height);
-                if (_y > (height - 30))
-                    _y = _y - 60;
-
-                int _x = width / (i + 1);
-                if ((width - _x) < 50)
+                using (Font f = new Font(fonts[findex], 15, FontStyle.Bold))
                 {
-                    _x = width - 60;
-                }
-                string word = code.Substring(i, 1);
-                if (rtnResult.VCodePos.Count < rightCodeLength)
-                {
-                    (int, int) percentPos = ToPercentPos((width, height), (_x, _y));
-                    // 添加正确答案 位置数据
-                    rtnResult.VCodePos.Add(new PointPosModel()
+                    using (Brush b = new SolidBrush(color_Array[cindex]))
                     {
-                        X = percentPos.Item1,
-                        Y = percentPos.Item2,
-                    });
-                    words.Add(word);
+                        string word = code.Substring(i, 1);
+                        var m = g.MeasureString(word, f);
+
+                        int _y = random.Next(height);
+                        if (_y > (height - m.Height))
+                            _y = _y - (int)m.Height * 2;
+
+
+                        //int _x = width / (i + 1);
+
+                        int _x = random.Next(width);
+                        if ((width - _x) < m.Width)
+                        {
+                            _x = width - (int)m.Width - 10;
+                        }
+
+                        if (_y < 0)
+                            _y = 0;
+
+                        if (_x < 0)
+                            _x = 0;
+
+                        if (rtnResult.VCodePos.Count < rightCodeLength)
+                        {
+                            (int, int) percentPos = ToPercentPos((width, height), (_x, _y));
+                            // 添加正确答案 位置数据
+                            rtnResult.VCodePos.Add(new PointPosModel()
+                            {
+                                X = percentPos.Item1,
+                                Y = percentPos.Item2,
+                            });
+                            words.Add(word);
+                        }
+                        g.DrawString(word, f, b, _x, _y);
+                    }
                 }
-                g.DrawString(word, f, b, _x, _y);
             }
+
             rtnResult.Words = words;
             rtnResult.VCodeTip = "请依次点击: " + string.Join(",", words);
 
             ms = new MemoryStream();
-            Img.Save(ms, ImageFormat.Jpeg);
+            Img.Save(ms, ImageFormat.Png);
             g.Dispose();
             Img.Dispose();
             ms.Dispose();

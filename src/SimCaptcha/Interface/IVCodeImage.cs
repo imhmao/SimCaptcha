@@ -7,6 +7,6 @@ namespace SimCaptcha.Interface
 {
     public interface IVCodeImage
     {
-        VCodeImgModel Create(string code, int width, int height);
+        VCodeImgModel Create(string code, int width, int heigh, ISimCaptchaOptions options);
     }
 }

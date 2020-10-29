@@ -241,38 +241,17 @@ namespace SimCaptcha
                 }
             }
 
-            #endregion
-
-            #region 未通过->错误次数达到上限?
             if (!isPass)
             {
-                // 本次没通过验证 -> 错误次数+1
-                vCodeKeyModel.ErrorNum++;
-                // 错误次数是否达上限
-                bool isMoreThanErrorNum = vCodeKeyModel.ErrorNum > _options.AllowErrorNum;
-                if (isMoreThanErrorNum)
-                {
-                    // 错误 -> 2.code:-2 验证码错误 且 错误次数已达上限 -> message: 这题有点难，为你换一个试试吧
-                    rtnResult.code = -2;
-                    rtnResult.message = "这题有点难, 为你换一个试试吧";
-                    RemoveCacheVCodeKey(verifyInfo.UserId);
-                    return rtnResult;
-                }
-                else
-                {
-                    // 错误 -> 1.code:-1 验证码错误 且 错误次数未达上限 -> message: 点错啦，请重试
-                    string vCodekeyJsonStrTemp = JsonHelper.Serialize(vCodeKeyModel);
-                    // AES加密 vCodekeyJsonStrTemp
-                    string vCodeKeyStrTemp = _encryptHelper.Encrypt(vCodekeyJsonStrTemp, _options.EncryptKey);
-                    // 更新 Cache 中的 vCodeKey
-                    _cacheHelper.Insert<string>(CachePrefixVCodeKey + verifyInfo.UserId, vCodeKeyStrTemp);
-
-                    rtnResult.code = -1;
-                    rtnResult.message = "点错啦，请重试";
-                    return rtnResult;
-                }
+                rtnResult.code = -4;
+                rtnResult.message = "验证失败";
+                return rtnResult;
             }
+
+
             #endregion
+
+
 
             #region 验证通过->下发ticket
             // 正确 -> code:0 下发票据 ticket
@@ -476,8 +455,8 @@ namespace SimCaptcha
         private VCodeImgModel CreateVCodeImg()
         {
             VCodeImgModel rtnResult = new VCodeImgModel { VCodePos = new List<PointPosModel>() };
-            string code = RandomCode.Create(6);
-            rtnResult = VCodeImage.Create(code, 200, 200);
+            string code = RandomCode.Create(this._options);
+            rtnResult = VCodeImage.Create(code, 200, 200, this._options);
 
             return rtnResult;
         }
